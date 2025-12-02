@@ -11,6 +11,9 @@ logging.basicConfig(level=logging.INFO)
 BASE_URL = "http://tv.roarzone.info/"
 PLAYER_URL_TEMPLATE = "http://tv.roarzone.info/player.php?stream={}"
 
+# NEW LOGO BASE URL (YOUR PROVIDED)
+LOGO_BASE = "https://nettv.fun/playlist/bdix/logo/"
+
 
 async def fetch_main_page(session):
     """Fetches the main page content."""
@@ -70,8 +73,10 @@ async def main():
         if not html:
             print("Failed to retrieve channel list. Exiting.")
             return
+
         soup = BeautifulSoup(html, "html.parser")
         channel_cards = soup.find_all("div", class_="channel-card")
+
         extracted_channels = []
         for idx, card in enumerate(channel_cards):
             stream_path = card.get("data-stream", "")
@@ -79,10 +84,15 @@ async def main():
             tags = card.get("data-tags", "")
             img = card.find("img")
             logo = img.get("src", "") if img else ""
-            if logo and (not logo.startswith("http")):
-                logo = f"{BASE_URL.rstrip('/')}/{logo.lstrip('/')}"
+
+            # CHANGE LOGO BASE URL
+            if logo:
+                filename = logo.split("/")[-1]
+                logo = LOGO_BASE + filename
+
             if not title and img:
                 title = img.get("alt", f"Channel {idx + 1}")
+
             if stream_path:
                 extracted_channels.append(
                     {
@@ -92,35 +102,44 @@ async def main():
                         "tags": tags,
                     }
                 )
+
+        # SORT BY ALPHABET A-Z
+        extracted_channels.sort(key=lambda x: x["name"].lower())
+
         total_channels = len(extracted_channels)
-        print(
-            f"Found {total_channels} channels. Starting concurrent token extraction (75 workers)..."
-        )
+        print(f"Found {total_channels} channels. Starting concurrent token extraction (75 workers)...")
+
         semaphore = asyncio.Semaphore(75)
         tasks = [process_channel(session, c, semaphore) for c in extracted_channels]
         results = await asyncio.gather(*tasks)
+
         valid_channels = [r for r in results if r is not None]
-        print(
-            f"\nScraping complete. Found {len(valid_channels)} valid streams out of {total_channels}."
-        )
+
+        print(f"\nScraping complete. Found {len(valid_channels)} valid streams out of {total_channels}.")
+
         filename = "playlist.m3u"
         print(f"Generating M3U playlist: {filename}")
+
         with open(filename, "w", encoding="utf-8") as f:
             f.write("#EXTM3U\n")
             f.write(f"#Generated at {time.ctime()}\n")
             f.write("#CREATED_BY_CoderBoyBD\n")
             f.write(f"#@TG:-https://t.me/codecrafter1\n")
+
             for channel in valid_channels:
                 name = channel["name"].replace(",", " ")
                 logo = channel["logo"]
                 group = channel["tags"] or "Uncategorized"
                 url = channel["m3u8_url"]
+
                 f.write(
                     f'#EXTINF:-1 tvg-id="{name}" tvg-name="{name}" tvg-logo="{logo}" group-title="{group}",{name}\n'
                 )
                 f.write(f"{url}\n")
+
         print("Playlist file created successfully.")
         print(f"File saved locally as: {filename}")
+
     print(f"Total execution time: {time.time() - start_time:.2f} seconds")
 
 
@@ -130,6 +149,7 @@ if __name__ == "__main__":
     except RuntimeError as e:
         logging.exception(f"Error getting running loop: {e}")
         loop = None
+
     if loop and loop.is_running():
         print("Event loop already running. Scheduling main task...")
         loop.create_task(main())
