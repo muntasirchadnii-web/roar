@@ -107,9 +107,9 @@ async def main():
         print(f"Generating M3U playlist: {filename}")
         with open(filename, "w", encoding="utf-8") as f:
             f.write("#EXTM3U\n")
-            f.write(f"# Generated at {time.ctime()}\n\n")
+            f.write(f"#Generated at {time.ctime()}\n")
             f.write("#CREATED_BY_CoderBoyBD\n")
-            f.write(f"# @TG:-https://t.me/codecrafter1\n")
+            f.write(f"#@TG:-https://t.me/codecrafter1\n")
             for channel in valid_channels:
                 name = channel["name"].replace(",", " ")
                 logo = channel["logo"]
